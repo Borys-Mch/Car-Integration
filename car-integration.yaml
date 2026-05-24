@@ -53,7 +53,6 @@ uart:
     rx_buffer_size: 1024
     debug:
       direction: BOTH
-      dummy_receiver: true
       after:
         delimiter: "\r\n"
       sequence:
@@ -75,6 +74,25 @@ sensor:
       name: "Car Throttle Position"
     intake_air_temperature:
       name: "Car Intake Air Temperature"
+  - platform: a7670e_gnss
+    uart_id: uart_modem
+    update_interval: 30s
+    latitude:
+      name: "Car Latitude"
+    longitude:
+      name: "Car Longitude"
+    altitude:
+      name: "Car Altitude"
+    speed:
+      name: "Car GNSS Speed"
+    course:
+      name: "Car Course"
+    hdop:
+      name: "Car GNSS HDOP"
+    satellites:
+      name: "Car GNSS Satellites"
+    fix_mode:
+      name: "Car GNSS Fix Mode"
 
 binary_sensor:
   - platform: status

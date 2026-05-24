@@ -47,6 +47,14 @@ A7670E можна додати другим UART:
 - `Car Open Gate` - подзвонити на номер з `gate_phone_number` у `car-integration.yaml`, почекати 10 секунд і скинути дзвінок.
 - `Car Modem Hang Up` - скинути дзвінок через `ATH`.
 
+Також доданий локальний компонент `a7670e_gnss`, який:
+
+- вмикає GNSS через `AT+CGNSSPWR=1`;
+- кожні 30 секунд виконує `AT+CGNSSINFO`;
+- публікує сенсори `Car Latitude`, `Car Longitude`, `Car Altitude`, `Car GNSS Speed`, `Car Course`, `Car GNSS HDOP`, `Car GNSS Satellites`, `Car GNSS Fix Mode`.
+
+Для першого fix модулю може знадобитися кілька хвилин. У приміщенні, без GNSS-антени або біля металу координати можуть не з'явитися взагалі. Нормальна відповідь з fix має містити режим `2` або `3`; без fix `AT+CGNSSINFO` часто повертає порожні поля.
+
 У цьому стартовому YAML LTE-канал не ввімкнений як мережа ESPHome. ESPHome стабільно працює через Wi-Fi/API. Для A7670E є два практичні наступні кроки:
 
 - GNSS: увімкнути NMEA на модемі AT-командами і парсити координати окремим ESPHome-компонентом.
