@@ -3,6 +3,9 @@ esphome:
   friendly_name: Car Integration
   build_path: /tmp/esphome-car-obd-build
 
+substitutions:
+  gate_phone_number: "+380981526161"
+
 esp32:
   variant: esp32c6
   framework:
@@ -43,6 +46,18 @@ uart:
     tx_pin: GPIO16
     baud_rate: 38400
     rx_buffer_size: 512
+  - id: uart_modem
+    rx_pin: GPIO20
+    tx_pin: GPIO21
+    baud_rate: 115200
+    rx_buffer_size: 1024
+    debug:
+      direction: BOTH
+      dummy_receiver: true
+      after:
+        delimiter: "\r\n"
+      sequence:
+        - lambda: UARTDebug::log_string(direction, bytes);
 
 sensor:
   - platform: elm327_uart
@@ -68,3 +83,49 @@ binary_sensor:
 button:
   - platform: restart
     name: "Car OBD Restart"
+  - platform: template
+    name: "Car Modem AT"
+    on_press:
+      - uart.write:
+          id: uart_modem
+          data: "AT\r"
+  - platform: template
+    name: "Car Modem Signal"
+    on_press:
+      - uart.write:
+          id: uart_modem
+          data: "AT+CSQ\r"
+  - platform: template
+    name: "Car Modem Network Registration"
+    on_press:
+      - uart.write:
+          id: uart_modem
+          data: "AT+CREG?\r"
+  - platform: template
+    name: "Car Modem Enable GNSS"
+    on_press:
+      - uart.write:
+          id: uart_modem
+          data: "AT+CGNSSPWR=1\r"
+  - platform: template
+    name: "Car Modem GNSS Info"
+    on_press:
+      - uart.write:
+          id: uart_modem
+          data: "AT+CGNSSINFO\r"
+  - platform: template
+    name: "Car Open Gate"
+    on_press:
+      - uart.write:
+          id: uart_modem
+          data: "ATD${gate_phone_number};\r"
+      - delay: 10s
+      - uart.write:
+          id: uart_modem
+          data: "ATH\r"
+  - platform: template
+    name: "Car Modem Hang Up"
+    on_press:
+      - uart.write:
+          id: uart_modem
+          data: "ATH\r"

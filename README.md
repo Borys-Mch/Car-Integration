@@ -2,6 +2,8 @@
 
 Цей проєкт стартує з надійної частини: ESP32-C6 читає OBD-II через ELM327 по UART і віддає сенсори в Home Assistant через ESPHome API/Wi-Fi.
 
+Цільове авто: Subaru Forester SG 2007. ELM327 поки лишається у режимі auto protocol (`ATSP0`), бо конкретний OBD-II протокол може залежати від ринку та ECU.
+
 ## Важливе обмеження
 
 ELM327 має Bluetooth Classic SPP-модуль. ESP32-C6 підтримує BLE, але не підтримує Bluetooth Classic/SPP, тому напряму з'єднатися з цим ELM327 по Bluetooth не вийде.
@@ -24,14 +26,26 @@ UART ELM327:
 
 На багатьох платах ELM327 UART-піни видно на місці, де модуль `BT-05/CY-BT-05` припаяний до плати. Зазвичай треба знайти `TXD`, `RXD`, `GND`, `VCC`. Якщо написів немає, зручно продзвонити доріжки від Bluetooth-модуля.
 
+Якщо ELM327 підключений тільки до 12 V і GND, але не до OBD-шини авто, відповіді на PID типу `010C`, `010D`, `0105` не буде. У логах це може виглядати як `SEARCHING...`, `NO DATA`, `UNABLE TO CONNECT` або `STOPPED`. Для повної перевірки потрібне підключення до OBD-роз'єму авто і увімкнене запалювання.
+
 ## A7670E-MASA + GNSS
 
 A7670E можна додати другим UART:
 
-- TX A7670E -> RX ESP32-C6
-- RX A7670E -> TX ESP32-C6
+- TX A7670E -> RX ESP32-C6, у YAML це `GPIO20`
+- RX A7670E -> TX ESP32-C6, у YAML це `GPIO21`
 - GND спільний
 - живлення модуля має витримувати піки струму LTE, зазвичай 2 A або більше
+
+У YAML додані базові кнопки Home Assistant для A7670E:
+
+- `Car Modem AT` - перевірити UART-зв'язок з модемом.
+- `Car Modem Signal` - виконати `AT+CSQ`.
+- `Car Modem Network Registration` - виконати `AT+CREG?`.
+- `Car Modem Enable GNSS` - увімкнути GNSS через `AT+CGNSSPWR=1`.
+- `Car Modem GNSS Info` - запитати `AT+CGNSSINFO`.
+- `Car Open Gate` - подзвонити на номер з `gate_phone_number` у `car-integration.yaml`, почекати 10 секунд і скинути дзвінок.
+- `Car Modem Hang Up` - скинути дзвінок через `ATH`.
 
 У цьому стартовому YAML LTE-канал не ввімкнений як мережа ESPHome. ESPHome стабільно працює через Wi-Fi/API. Для A7670E є два практичні наступні кроки:
 
