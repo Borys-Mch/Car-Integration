@@ -6,7 +6,9 @@ from esphome.const import (
     CONF_ID,
     CONF_LATITUDE,
     CONF_LONGITUDE,
+    CONF_PASSWORD,
     CONF_SPEED,
+    CONF_USERNAME,
     DEVICE_CLASS_DISTANCE,
     DEVICE_CLASS_SPEED,
     STATE_CLASS_MEASUREMENT,
@@ -25,7 +27,13 @@ A7670EGNSSComponent = a7670e_gnss_ns.class_(
 CONF_COURSE = "course"
 CONF_FIX_MODE = "fix_mode"
 CONF_HDOP = "hdop"
+CONF_MQTT = "mqtt"
+CONF_APN = "apn"
+CONF_HOST = "host"
+CONF_PORT = "port"
 CONF_SATELLITES = "satellites"
+CONF_TOPIC = "topic"
+CONF_USE_TLS = "use_tls"
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -70,6 +78,17 @@ CONFIG_SCHEMA = (
                 accuracy_decimals=0,
                 state_class=STATE_CLASS_MEASUREMENT,
             ),
+            cv.Optional(CONF_MQTT): cv.Schema(
+                {
+                    cv.Required(CONF_APN): cv.string,
+                    cv.Required(CONF_HOST): cv.string,
+                    cv.Required(CONF_PORT): cv.port,
+                    cv.Required(CONF_USERNAME): cv.string,
+                    cv.Required(CONF_PASSWORD): cv.string,
+                    cv.Optional(CONF_TOPIC, default="car/forester/state"): cv.string,
+                    cv.Optional(CONF_USE_TLS, default=True): cv.boolean,
+                }
+            ),
         }
     )
     .extend(cv.polling_component_schema("30s"))
@@ -113,3 +132,12 @@ async def to_code(config):
     if fix_mode_config := config.get(CONF_FIX_MODE):
         sens = await sensor.new_sensor(fix_mode_config)
         cg.add(var.set_fix_mode_sensor(sens))
+
+    if mqtt_config := config.get(CONF_MQTT):
+        cg.add(var.set_mqtt_apn(mqtt_config[CONF_APN]))
+        cg.add(var.set_mqtt_host(mqtt_config[CONF_HOST]))
+        cg.add(var.set_mqtt_port(mqtt_config[CONF_PORT]))
+        cg.add(var.set_mqtt_username(mqtt_config[CONF_USERNAME]))
+        cg.add(var.set_mqtt_password(mqtt_config[CONF_PASSWORD]))
+        cg.add(var.set_mqtt_topic(mqtt_config[CONF_TOPIC]))
+        cg.add(var.set_mqtt_use_tls(mqtt_config[CONF_USE_TLS]))
