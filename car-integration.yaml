@@ -7,7 +7,7 @@ substitutions:
   gate_phone_number: "+380981526161"
 
 esp32:
-  variant: esp32c6
+  variant: ESP32S3
   framework:
     type: esp-idf
 
@@ -43,17 +43,18 @@ mqtt:
   port: !secret mqtt_port
   username: !secret mqtt_username
   password: !secret mqtt_password
-  discovery: false
+  discovery: true
+  discovery_prefix: homeassistant
 
 uart:
   - id: uart_obd
-    rx_pin: GPIO17
-    tx_pin: GPIO16
+    rx_pin: GPIO44
+    tx_pin: GPIO43
     baud_rate: 38400
     rx_buffer_size: 512
   - id: uart_modem
-    rx_pin: GPIO20
-    tx_pin: GPIO21
+    rx_pin: GPIO18
+    tx_pin: GPIO17
     baud_rate: 115200
     rx_buffer_size: 1024
     debug:
@@ -106,6 +107,8 @@ sensor:
       password: !secret mqtt_password
       use_tls: !secret use_tls
       topic: "car/forester/state"
+      command_topic: "car/forester/cmd"
+      gate_phone_number: "${gate_phone_number}"
 
 binary_sensor:
   - platform: status

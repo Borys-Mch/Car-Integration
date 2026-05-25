@@ -41,7 +41,13 @@ namespace esphome
           this->last_mqtt_retry_ = now;
           this->ensure_mqtt_connected_();
         }
+        if (this->mqtt_connected_ && !this->mqtt_subscribed_)
+        {
+          this->mqtt_subscribe_commands_();
+        }
       }
+
+      this->process_incoming_uart_();
 
       if (this->mqtt_connected_ && !this->discovery_published_)
       {
@@ -163,13 +169,43 @@ namespace esphome
         this->mqtt_failures_++;
         this->mqtt_connected_ = false;
         this->mqtt_started_ = false;
+        this->mqtt_subscribed_ = false;
         return false;
       }
 
       this->mqtt_failures_ = 0;
       this->mqtt_connected_ = true;
+      this->mqtt_subscribed_ = false;
       ESP_LOGI(TAG, "A7670E MQTT connected");
+      this->mqtt_subscribe_commands_();
       return true;
+    }
+
+    bool A7670EGNSSComponent::mqtt_subscribe_commands_()
+    {
+      if (!this->mqtt_connected_ || this->mqtt_command_topic_.empty())
+      {
+        return false;
+      }
+      if (this->mqtt_subscribed_)
+      {
+        return true;
+      }
+
+      std::string command = "AT+CMQTTSUB=0,\"" + this->mqtt_command_topic_ + "\",1";
+      std::string response = this->transact_(command.c_str(), 10000);
+      ESP_LOGD(TAG, "%s -> %s", command.c_str(), response.c_str());
+      this->mqtt_subscribed_ = response.find("OK") != std::string::npos ||
+                               response.find("+CMQTTSUB: 0,0") != std::string::npos;
+      if (this->mqtt_subscribed_)
+      {
+        ESP_LOGI(TAG, "Subscribed to MQTT commands on %s", this->mqtt_command_topic_.c_str());
+      }
+      else
+      {
+        ESP_LOGW(TAG, "Failed to subscribe to MQTT commands: %s", response.c_str());
+      }
+      return this->mqtt_subscribed_;
     }
 
     bool A7670EGNSSComponent::mqtt_command_ok_(const char *command, uint32_t timeout_ms)
@@ -199,12 +235,14 @@ namespace esphome
       {
         this->mqtt_connected_ = false;
         this->mqtt_started_ = false;
+        this->mqtt_subscribed_ = false;
         return false;
       }
       if (!this->write_prompt_data_(topic, 8000))
       {
         this->mqtt_connected_ = false;
         this->mqtt_started_ = false;
+        this->mqtt_subscribed_ = false;
         return false;
       }
 
@@ -215,12 +253,14 @@ namespace esphome
       {
         this->mqtt_connected_ = false;
         this->mqtt_started_ = false;
+        this->mqtt_subscribed_ = false;
         return false;
       }
       if (!this->write_prompt_data_(payload, 8000))
       {
         this->mqtt_connected_ = false;
         this->mqtt_started_ = false;
+        this->mqtt_subscribed_ = false;
         return false;
       }
 
@@ -231,6 +271,7 @@ namespace esphome
       {
         this->mqtt_connected_ = false;
         this->mqtt_started_ = false;
+        this->mqtt_subscribed_ = false;
         return false;
       }
 
@@ -353,6 +394,25 @@ namespace esphome
       };
       static const uint8_t sensor_count = sizeof(sensors) / sizeof(sensors[0]);
 
+      struct DiscoveryButton
+      {
+        const char *uid;
+        const char *name;
+        const char *payload;
+        const char *icon;
+      };
+
+      static const DiscoveryButton buttons[] = {
+          {"car_modem_at", "Car Modem AT", "AT", "mdi:console"},
+          {"car_modem_signal", "Car Modem Signal", "CSQ", "mdi:signal"},
+          {"car_modem_network_registration", "Car Modem Network Registration", "CREG", "mdi:access-point-network"},
+          {"car_modem_enable_gnss", "Car Modem Enable GNSS", "ENABLE_GNSS", "mdi:crosshairs-gps"},
+          {"car_modem_gnss_info", "Car Modem GNSS Info", "GNSSINFO", "mdi:satellite-variant"},
+          {"car_open_gate", "Car Open Gate", "OPEN", "mdi:boom-gate-up"},
+          {"car_modem_hang_up", "Car Modem Hang Up", "HANGUP", "mdi:phone-hangup"},
+      };
+      static const uint8_t button_count = sizeof(buttons) / sizeof(buttons[0]);
+
       if (this->discovery_index_ < sensor_count)
       {
         const auto &sensor = sensors[this->discovery_index_];
@@ -377,14 +437,18 @@ namespace esphome
         this->mqtt_publish_raw_(topic, payload, true);
         this->discovery_index_++;
       }
-      else if (this->discovery_index_ == sensor_count)
+      else if (this->discovery_index_ < sensor_count + button_count)
       {
-        std::string button_payload = "{\"name\":\"Open Gate\",\"uniq_id\":\"car_barrier_btn\",\"cmd_t\":\"car/forester/cmd\","
-                                     "\"pl_press\":\"OPEN\",\"icon\":\"mdi:boom-gate-up\"," + availability + "," + device + "}";
-        this->mqtt_publish_raw_("homeassistant/button/car_barrier_btn/config", button_payload, true);
+        const auto &button = buttons[this->discovery_index_ - sensor_count];
+        std::string topic = "homeassistant/button/" + std::string(button.uid) + "/config";
+        std::string button_payload = "{\"name\":\"" + std::string(button.name) + "\",\"uniq_id\":\"" +
+                                     std::string(button.uid) + "\",\"cmd_t\":\"" + this->mqtt_command_topic_ +
+                                     "\",\"pl_press\":\"" + std::string(button.payload) + "\",\"icon\":\"" +
+                                     std::string(button.icon) + "\"" + availability + "," + device + "}";
+        this->mqtt_publish_raw_(topic, button_payload, true);
         this->discovery_index_++;
       }
-      else if (this->discovery_index_ == sensor_count + 1)
+      else if (this->discovery_index_ == sensor_count + button_count)
       {
         this->mqtt_publish_raw_("car/forester/status", "online", true);
         this->discovery_published_ = true;
@@ -396,8 +460,169 @@ namespace esphome
     {
       while (this->available())
       {
-        this->read();
+        this->handle_incoming_char_(static_cast<char>(this->read()));
       }
+    }
+
+    void A7670EGNSSComponent::process_incoming_uart_()
+    {
+      while (this->available())
+      {
+        this->handle_incoming_char_(static_cast<char>(this->read()));
+      }
+    }
+
+    void A7670EGNSSComponent::handle_incoming_char_(char c)
+    {
+      if (c == '\r')
+      {
+        return;
+      }
+      if (c == '\n')
+      {
+        if (!this->incoming_line_.empty())
+        {
+          this->handle_incoming_line_(this->incoming_line_);
+          this->incoming_line_.clear();
+        }
+        return;
+      }
+
+      if (this->incoming_line_.size() < 256)
+      {
+        this->incoming_line_.push_back(c);
+      }
+      else
+      {
+        this->incoming_line_.clear();
+      }
+    }
+
+    void A7670EGNSSComponent::handle_incoming_line_(const std::string &line)
+    {
+      size_t start = line.find_first_not_of(" \t");
+      if (start == std::string::npos)
+      {
+        return;
+      }
+      size_t end = line.find_last_not_of(" \t");
+      std::string trimmed = line.substr(start, end - start + 1);
+
+      if (trimmed.find("+CMQTTCONNLOST") != std::string::npos)
+      {
+        ESP_LOGW(TAG, "MQTT connection lost: %s", trimmed.c_str());
+        this->mqtt_connected_ = false;
+        this->mqtt_subscribed_ = false;
+        this->mqtt_started_ = false;
+        return;
+      }
+
+      if (trimmed.find("NO CARRIER") != std::string::npos || trimmed.find("BUSY") != std::string::npos ||
+          trimmed.find("NO ANSWER") != std::string::npos)
+      {
+        this->call_terminal_seen_ = true;
+        ESP_LOGI(TAG, "Call status: %s", trimmed.c_str());
+        return;
+      }
+
+      if (trimmed == "AT" || trimmed == "CSQ" || trimmed == "CREG" || trimmed == "ENABLE_GNSS" ||
+          trimmed == "GNSSINFO" || trimmed == "OPEN" || trimmed == "HANGUP")
+      {
+        this->handle_command_payload_(trimmed);
+        return;
+      }
+
+      bool mqtt_payload_line = trimmed.find("+CMQTTRXPAYLOAD") != std::string::npos ||
+                               trimmed.find(this->mqtt_command_topic_) != std::string::npos;
+      if (mqtt_payload_line)
+      {
+        if (trimmed.find("ENABLE_GNSS") != std::string::npos)
+          this->handle_command_payload_("ENABLE_GNSS");
+        else if (trimmed.find("GNSSINFO") != std::string::npos)
+          this->handle_command_payload_("GNSSINFO");
+        else if (trimmed.find("HANGUP") != std::string::npos)
+          this->handle_command_payload_("HANGUP");
+        else if (trimmed.find("OPEN") != std::string::npos)
+          this->handle_command_payload_("OPEN");
+        else if (trimmed.find("CREG") != std::string::npos)
+          this->handle_command_payload_("CREG");
+        else if (trimmed.find("CSQ") != std::string::npos)
+          this->handle_command_payload_("CSQ");
+        else if (trimmed.find("AT") != std::string::npos)
+          this->handle_command_payload_("AT");
+      }
+    }
+
+    void A7670EGNSSComponent::handle_command_payload_(const std::string &payload)
+    {
+      ESP_LOGI(TAG, "MQTT command received: %s", payload.c_str());
+
+      if (payload == "AT")
+      {
+        ESP_LOGI(TAG, "AT -> %s", this->transact_("AT", 3000).c_str());
+      }
+      else if (payload == "CSQ")
+      {
+        ESP_LOGI(TAG, "AT+CSQ -> %s", this->transact_("AT+CSQ", 5000).c_str());
+      }
+      else if (payload == "CREG")
+      {
+        ESP_LOGI(TAG, "AT+CREG? -> %s", this->transact_("AT+CREG?", 5000).c_str());
+      }
+      else if (payload == "ENABLE_GNSS")
+      {
+        ESP_LOGI(TAG, "AT+CGNSSPWR=1 -> %s", this->transact_("AT+CGNSSPWR=1", 9000).c_str());
+      }
+      else if (payload == "GNSSINFO")
+      {
+        ESP_LOGI(TAG, "AT+CGNSSINFO -> %s", this->transact_("AT+CGNSSINFO", 9000).c_str());
+      }
+      else if (payload == "OPEN")
+      {
+        this->call_gate_();
+      }
+      else if (payload == "HANGUP")
+      {
+        ESP_LOGI(TAG, "ATH -> %s", this->transact_("ATH", 5000).c_str());
+      }
+    }
+
+    void A7670EGNSSComponent::call_gate_()
+    {
+      if (this->gate_phone_number_.empty())
+      {
+        ESP_LOGW(TAG, "Gate phone number is not configured");
+        return;
+      }
+
+      ESP_LOGI(TAG, "Calling gate number");
+      this->transact_("AT+CMQTTDISC=0,10", 5000);
+      this->mqtt_connected_ = false;
+      this->mqtt_subscribed_ = false;
+      delay(500);
+
+      std::string command = "ATD" + this->gate_phone_number_ + ";";
+      this->call_terminal_seen_ = false;
+      ESP_LOGI(TAG, "%s -> %s", command.c_str(), this->transact_(command.c_str(), 5000).c_str());
+
+      uint32_t started = millis();
+      while (millis() - started < 30000)
+      {
+        while (this->available())
+        {
+          this->handle_incoming_char_(static_cast<char>(this->read()));
+        }
+
+        if (this->call_terminal_seen_)
+        {
+          break;
+        }
+        delay(100);
+      }
+
+      ESP_LOGI(TAG, "ATH -> %s", this->transact_("ATH", 5000).c_str());
+      delay(1000);
+      this->ensure_mqtt_connected_();
     }
 
     std::string A7670EGNSSComponent::transact_(const char *command, uint32_t timeout_ms)

@@ -33,7 +33,9 @@ CONF_HOST = "host"
 CONF_PORT = "port"
 CONF_SATELLITES = "satellites"
 CONF_TOPIC = "topic"
+CONF_COMMAND_TOPIC = "command_topic"
 CONF_USE_TLS = "use_tls"
+CONF_GATE_PHONE_NUMBER = "gate_phone_number"
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -86,7 +88,9 @@ CONFIG_SCHEMA = (
                     cv.Required(CONF_USERNAME): cv.string,
                     cv.Required(CONF_PASSWORD): cv.string,
                     cv.Optional(CONF_TOPIC, default="car/forester/state"): cv.string,
+                    cv.Optional(CONF_COMMAND_TOPIC, default="car/forester/cmd"): cv.string,
                     cv.Optional(CONF_USE_TLS, default=True): cv.boolean,
+                    cv.Optional(CONF_GATE_PHONE_NUMBER, default=""): cv.string,
                 }
             ),
         }
@@ -140,4 +144,6 @@ async def to_code(config):
         cg.add(var.set_mqtt_username(mqtt_config[CONF_USERNAME]))
         cg.add(var.set_mqtt_password(mqtt_config[CONF_PASSWORD]))
         cg.add(var.set_mqtt_topic(mqtt_config[CONF_TOPIC]))
+        cg.add(var.set_mqtt_command_topic(mqtt_config[CONF_COMMAND_TOPIC]))
         cg.add(var.set_mqtt_use_tls(mqtt_config[CONF_USE_TLS]))
+        cg.add(var.set_gate_phone_number(mqtt_config[CONF_GATE_PHONE_NUMBER]))

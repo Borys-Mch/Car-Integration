@@ -33,8 +33,10 @@ namespace esphome
       void set_mqtt_username(const std::string &username) { mqtt_username_ = username; }
       void set_mqtt_password(const std::string &password) { mqtt_password_ = password; }
       void set_mqtt_topic(const std::string &topic) { mqtt_topic_ = topic; }
+      void set_mqtt_command_topic(const std::string &topic) { mqtt_command_topic_ = topic; }
       void set_mqtt_client_id(const std::string &client_id) { mqtt_client_id_ = client_id; }
       void set_mqtt_use_tls(bool use_tls) { mqtt_use_tls_ = use_tls; }
+      void set_gate_phone_number(const std::string &number) { gate_phone_number_ = number; }
 
     protected:
       sensor::Sensor *latitude_sensor_{nullptr};
@@ -50,6 +52,8 @@ namespace esphome
       bool mqtt_enabled_{false};
       bool mqtt_started_{false};
       bool mqtt_connected_{false};
+      bool mqtt_subscribed_{false};
+      bool call_terminal_seen_{false};
       bool discovery_published_{false};
       uint8_t discovery_index_{0};
       uint8_t init_index_{0};
@@ -61,18 +65,27 @@ namespace esphome
       std::string mqtt_username_;
       std::string mqtt_password_;
       std::string mqtt_topic_{"car/forester/state"};
+      std::string mqtt_command_topic_{"car/forester/cmd"};
       std::string mqtt_client_id_{"car-integration"};
+      std::string gate_phone_number_;
+      std::string incoming_line_;
       bool mqtt_use_tls_{true};
       uint32_t last_mqtt_retry_{0};
 
       bool initialize_next_command_();
       bool ensure_mqtt_connected_();
+      bool mqtt_subscribe_commands_();
       bool mqtt_command_ok_(const char *command, uint32_t timeout_ms = 12000);
       bool mqtt_publish_(const std::string &payload);
       bool mqtt_publish_raw_(const std::string &topic, const std::string &payload, bool retain);
       void publish_discovery_();
       void publish_discovery_next_();
       void flush_input_();
+      void process_incoming_uart_();
+      void handle_incoming_char_(char c);
+      void handle_incoming_line_(const std::string &line);
+      void handle_command_payload_(const std::string &payload);
+      void call_gate_();
       std::string transact_(const char *command, uint32_t timeout_ms = 5000);
       bool write_prompt_data_(const std::string &data, uint32_t timeout_ms = 5000);
       bool parse_cgnssinfo_(const std::string &response);
