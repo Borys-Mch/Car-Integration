@@ -43,6 +43,11 @@ namespace esphome
         }
       }
 
+      if (this->mqtt_connected_ && !this->discovery_published_)
+      {
+        this->publish_discovery_next_();
+      }
+
       std::string response = this->transact_("AT+CGNSSINFO", 9000);
       if (!this->parse_cgnssinfo_(response))
       {
@@ -306,6 +311,78 @@ namespace esphome
       else
       {
         ESP_LOGW(TAG, "Home Assistant MQTT discovery publish failed");
+      }
+    }
+
+    void A7670EGNSSComponent::publish_discovery_next_()
+    {
+      const std::string device =
+          "\"dev\":{\"ids\":[\"car_forester\"],\"name\":\"Car Forester\","
+          "\"mf\":\"DIY\",\"mdl\":\"ESP32-C6 + A7670E + ELM327\"}";
+      const std::string availability =
+          ",\"avty_t\":\"car/forester/status\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\"";
+      const std::string state = "\"stat_t\":\"" + this->mqtt_topic_ + "\"";
+
+      struct DiscoverySensor
+      {
+        const char *uid;
+        const char *name;
+        const char *value_template;
+        const char *unit;
+        const char *icon;
+        const char *device_class;
+      };
+
+      static const DiscoverySensor sensors[] = {
+          {"car_forester_lat", "Car Latitude", "{{ value_json.lat }}", "°", "mdi:crosshairs-gps", ""},
+          {"car_forester_lon", "Car Longitude", "{{ value_json.lon }}", "°", "mdi:crosshairs-gps", ""},
+          {"car_forester_altitude", "Car Altitude", "{{ value_json.altitude }}", "m", "mdi:map-marker-distance",
+           "distance"},
+          {"car_forester_gnss_speed", "Car GNSS Speed", "{{ value_json.speed }}", "km/h", "mdi:speedometer", "speed"},
+          {"car_forester_course", "Car Course", "{{ value_json.course }}", "°", "mdi:compass", ""},
+          {"car_forester_hdop", "Car GNSS HDOP", "{{ value_json.hdop }}", "", "mdi:map-marker-check", ""},
+          {"car_forester_satellites", "Car GNSS Satellites", "{{ value_json.satellites }}", "", "mdi:satellite-variant",
+           ""},
+          {"car_forester_fix_mode", "Car GNSS Fix Mode", "{{ value_json.fix_mode }}", "", "mdi:crosshairs-question", ""},
+      };
+      static const uint8_t sensor_count = sizeof(sensors) / sizeof(sensors[0]);
+
+      if (this->discovery_index_ < sensor_count)
+      {
+        const auto &sensor = sensors[this->discovery_index_];
+        std::string topic = "homeassistant/sensor/" + std::string(sensor.uid) + "/config";
+        std::string payload = "{\"name\":\"" + std::string(sensor.name) + "\",\"uniq_id\":\"" +
+                              std::string(sensor.uid) + "\"," + state + ",\"val_tpl\":\"" +
+                              std::string(sensor.value_template) + "\"";
+        if (sensor.unit[0] != '\0')
+        {
+          payload += ",\"unit_of_meas\":\"" + std::string(sensor.unit) + "\"";
+        }
+        if (sensor.icon[0] != '\0')
+        {
+          payload += ",\"icon\":\"" + std::string(sensor.icon) + "\"";
+        }
+        if (sensor.device_class[0] != '\0')
+        {
+          payload += ",\"dev_cla\":\"" + std::string(sensor.device_class) + "\"";
+        }
+        payload += availability + "," + device + "}";
+
+        this->mqtt_publish_raw_(topic, payload, true);
+        this->discovery_index_++;
+      }
+      else if (this->discovery_index_ == sensor_count)
+      {
+        std::string button_payload = "{\"name\":\"Open Gate\",\"uniq_id\":\"car_barrier_btn\",\"cmd_t\":\"car/forester/cmd\","
+                                     "\"pl_press\":\"OPEN\",\"icon\":\"mdi:boom-gate-up\"," + availability + "," + device + "}";
+        this->mqtt_publish_raw_("homeassistant/button/car_barrier_btn/config", button_payload, true);
+        this->discovery_index_++;
+      }
+      else if (this->discovery_index_ == sensor_count + 1)
+      {
+        this->mqtt_publish_raw_("car/forester/status", "online", true);
+        this->discovery_published_ = true;
+        ESP_LOGI(TAG, "Home Assistant MQTT discovery published");
       }
     }
 

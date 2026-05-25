@@ -51,6 +51,7 @@ namespace esphome
       bool mqtt_started_{false};
       bool mqtt_connected_{false};
       bool discovery_published_{false};
+      uint8_t discovery_index_{0};
       uint8_t init_index_{0};
       uint8_t mqtt_failures_{0};
 
@@ -70,6 +71,7 @@ namespace esphome
       bool mqtt_publish_(const std::string &payload);
       bool mqtt_publish_raw_(const std::string &topic, const std::string &payload, bool retain);
       void publish_discovery_();
+      void publish_discovery_next_();
       void flush_input_();
       std::string transact_(const char *command, uint32_t timeout_ms = 5000);
       bool write_prompt_data_(const std::string &data, uint32_t timeout_ms = 5000);
