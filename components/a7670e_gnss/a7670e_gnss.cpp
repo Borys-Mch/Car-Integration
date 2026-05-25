@@ -344,6 +344,13 @@ namespace esphome
           {"car_forester_satellites", "Car GNSS Satellites", "{{ value_json.satellites }}", "", "mdi:satellite-variant",
            ""},
           {"car_forester_fix_mode", "Car GNSS Fix Mode", "{{ value_json.fix_mode }}", "", "mdi:crosshairs-question", ""},
+          {"car_rpm", "Car RPM", "{{ value_json.rpm }}", "rpm", "mdi:engine", ""},
+          {"car_speed_obd", "Car Speed OBD", "{{ value_json.speed_obd }}", "km/h", "mdi:speedometer", "speed"},
+          {"car_coolant_temp", "Car Coolant Temperature", "{{ value_json.coolant_temp }}", "°C", "mdi:thermometer", "temperature"},
+          {"car_throttle", "Car Throttle Position", "{{ value_json.throttle }}", "%", "mdi:car-turbocharger", ""},
+          {"car_fuel", "Car Fuel Level", "{{ value_json.fuel }}", "%", "mdi:fuel", ""},
+          {"car_voltage", "Car ECU Voltage", "{{ value_json.voltage }}", "V", "mdi:car-battery", "voltage"},
+          {"car_intake_temp", "Car Intake Air Temperature", "{{ value_json.intake_temp }}", "°C", "mdi:thermometer", "temperature"},
       };
       static const uint8_t sensor_count = sizeof(sensors) / sizeof(sensors[0]);
 
