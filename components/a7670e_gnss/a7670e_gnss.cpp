@@ -348,7 +348,6 @@ namespace esphome
           {"car_speed_obd", "Car Speed OBD", "{{ value_json.speed_obd }}", "km/h", "mdi:speedometer", "speed"},
           {"car_coolant_temp", "Car Coolant Temperature", "{{ value_json.coolant_temp }}", "°C", "mdi:thermometer", "temperature"},
           {"car_throttle", "Car Throttle Position", "{{ value_json.throttle }}", "%", "mdi:car-turbocharger", ""},
-          {"car_fuel", "Car Fuel Level", "{{ value_json.fuel }}", "%", "mdi:fuel", ""},
           {"car_voltage", "Car ECU Voltage", "{{ value_json.voltage }}", "V", "mdi:car-battery", "voltage"},
           {"car_intake_temp", "Car Intake Air Temperature", "{{ value_json.intake_temp }}", "°C", "mdi:thermometer", "temperature"},
       };

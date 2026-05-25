@@ -79,8 +79,6 @@ sensor:
       name: "Car Throttle Position"
     intake_air_temperature:
       name: "Car Intake Air Temperature"
-    fuel_level:
-      name: "Car Fuel Level"
   - platform: a7670e_gnss
     uart_id: uart_modem
     update_interval: 30s
